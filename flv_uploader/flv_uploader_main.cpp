@@ -190,7 +190,7 @@ void publish_es(std::string const& publish_addr, std::string const& upload_id, c
   std::cout << req.header_to_string()<< std::endl;
 
   std::cout << "request data>" << std::endl;
-  std::cout << flv_util::to_hex(req.body().data())<< std::endl;
+  std::cout << flv_util::to_hex(es_str)<< std::endl;
 
   castis::http::AsyncClient client;
 	castis::http::Response res;
@@ -254,7 +254,7 @@ int main() {
     using namespace flv_message;
     context.publish_id_ = upload_id;
     unsigned six = 1;
-    unsigned eix = 6;
+    unsigned eix = 234; //234
 
     std::string directory = "/data/project/git/rtmp-module/build/dump/flv_es";
     std::string file_name = "flv_es.dump";
@@ -265,7 +265,7 @@ int main() {
 
       read_flv_es_dump_file(context, file_path);
 
-      if (state == init && read_to_send(context)) {
+      if (state == init && ready_to_send(context)) {
         std::error_code ec;
         init_publish(publish_addr, upload_id, context, ec);
 

@@ -150,24 +150,6 @@ int ptr_test() {
 } 
 
 
-void flash_test() {
-  //std::string fn = "/data/project/git/rtmp-module/build/20181130104010.mp4.h264ac3.dump/audio/audio.dump.2";
-  std::string directory = "/data/project/git/rtmp-module/build/20181130104010.mp4.h264ac3.dump/video";
-  std::string file_name = "video.dump";
-  std::string file_path;
-
-  for (unsigned index=1; index <= 3; ++index )  {
-    file_path = directory + "/" + file_name + "." + std::to_string(index);
-    parsingflv::parsing_flv(file_path);
-  }
-}
-
 int main() {
-  // std::string file_path = "/data/project/git/rtmp-module/build/20181130104010.mp4.h264ac3.dump/of.h264";
-  // parsingflv::parsingh_flv(file_path);
-
-  flash_test();
-
-
   return 0;
 } 

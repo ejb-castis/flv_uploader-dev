@@ -323,6 +323,22 @@ bool is_avc_sequence_header(unsigned char* const & buffer) {
   return false;
 }
 
+bool is_avc_end_of_sequence(unsigned char* const & buffer) {
+  uint16_t fmt_avc_type;
+  get_2byte(buffer, fmt_avc_type); 
+
+  unsigned char fmt;
+  fmt = (fmt_avc_type & 0xff00) >> 8;
+
+  unsigned char codec_id = fmt & 0x0f;
+  unsigned char avc_type = fmt_avc_type & 0x00ff;
+
+  if (codec_id == FLV_AVC && avc_type == FLV_AVC_EOS) {
+    return true;
+  }
+  return false;
+}
+
 std::string encoding_base_64(buffer_t &src) {
   char const *p =  reinterpret_cast<const char *>(src.ptr_);
   std::string in(p,  src.len_);
@@ -458,6 +474,10 @@ bool get_first_sps_and_first_pps_from_avc_sequence_header(unsigned char*& buffer
     }
 
   return true;
+}
+
+void get_avc_end_of_sequence(unsigned char*& buffer, buffer_t& eos, std::size_t& buffer_len) {
+  read_nbyte(buffer, buffer_len, eos, buffer_len);
 }
 
 bool get_video(unsigned char*& buffer, buffer_t& video_es, video_frame_t& video_frame, std::size_t& buffer_len) {

@@ -7,6 +7,9 @@ namespace castis {
 namespace streamer {
 
 typedef enum { video=1, audio=2 } media_es_type_t;
+const uint64_t READY_TO_SEND_AUDIO_FRAME_COUNT = 4;
+const uint64_t READY_TO_SEND_VIDEO_FRAME_COUNT = 4;
+
 struct AudioPublishEsInit {
 public:
   uint8_t trackId{2};
@@ -41,7 +44,7 @@ public:
   uint8_t isKeyFrame{1};
   uint64_t pts{0};
   uint64_t dts{0};
-  std::size_t size{0};
+  uint32_t size{0};
   
   std::string publish_id;
   flv_util::buffer_t* const data;
@@ -61,13 +64,20 @@ public:
   std::string publish_id_;
   AudioPublishEsInit audio_init_es_;
   VideoPublishEsInit video_init_es_;
+  std::vector<unsigned char> video_eos_;
+  
   uint8_t nal_startcode_len_{4};
 
   std::list<media_publish_es_ptr> media_es_;
   uint64_t frame_number_{0};
+  uint64_t audio_frame_number_{0};
+  uint64_t video_frame_number_{0};
 };
 
 std::string to_string(MediaPublishEsContext& context);
+
+bool ready_to_send(castis::streamer::MediaPublishEsContext& context);
+bool end_of_video_es(castis::streamer::MediaPublishEsContext& context);
 media_publish_es_ptr make_media_es(
   media_es_type_t type,
   flv_util::buffer_t* const data,
@@ -75,7 +85,7 @@ media_publish_es_ptr make_media_es(
   uint8_t is_key_frame,
   uint64_t pts,
   uint64_t dts,
-  std::size_t size,
+  uint32_t size,
   int& ec
 );
 
@@ -85,13 +95,11 @@ media_publish_es_ptr make_media_es(
 
 namespace flv_message {
 
-const uint64_t READY_TO_SEND_FRAME_COUNT = 4;
 enum FLV_ES_TYPE {
   FLV_AUDIO_ES = 8,
   FLV_VIDEO_ES = 9
 };
 
-bool read_to_send(castis::streamer::MediaPublishEsContext& context);
 bool read_flv_es_dump_file(castis::streamer::MediaPublishEsContext& context, std::string const& file_path);
 bool process_flv_es_message(
   castis::streamer::MediaPublishEsContext& context, 

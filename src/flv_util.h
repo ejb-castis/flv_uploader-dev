@@ -25,6 +25,7 @@ std::vector<unsigned char> to_vector(uint32_t value);
 std::vector<unsigned char> to_vector(uint64_t value);
 std::string to_string(buffer_t const& buffer);
 unsigned char to_uchar(char const ch);
+std::string to_hex(std::vector<unsigned char>& value, std::size_t showing_max_len=32);
 std::string to_hex(unsigned char const ch);
 std::string to_hex(char const ch);
 std::string to_hex(uint32_t value);

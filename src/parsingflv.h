@@ -40,8 +40,9 @@ bool get_audio(unsigned char*& buffer,
   flv_util::buffer_t& audio_es, 
   flv::audio_frame_t& audio_frame,
   std::size_t& buffer_len);
-bool is_avc_video(unsigned char* const & buffer);  
 bool is_avc_sequence_header(unsigned char* const & buffer);
+bool is_avc_video(unsigned char* const & buffer);  
+bool is_avc_end_of_sequence(unsigned char* const & buffer);
 std::string encoding_base_64(flv_util::buffer_t &src);
 bool get_first_sps_and_first_pps_from_avc_sequence_header(
   unsigned char*& buffer,
@@ -51,6 +52,7 @@ bool get_first_sps_and_first_pps_from_avc_sequence_header(
 bool get_video(unsigned char*& buffer, 
   flv_util::buffer_t& video_es, flv::video_frame_t& video_frame, 
   std::size_t& buffer_len);  
+void get_avc_end_of_sequence(unsigned char*& buffer, flv_util::buffer_t& eos, std::size_t& buffer_len);
 void replace_nalu_strat_code_from_mp4_to_ts(
   unsigned char nal_start_code_length,
   flv_util::buffer_t const& mp4_video_es, flv_util::buffer_t& ts_video_es);

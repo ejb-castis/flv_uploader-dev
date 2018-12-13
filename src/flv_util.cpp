@@ -121,11 +121,14 @@ std::string to_hex(unsigned char* const buffer, std::size_t buffer_len, std::siz
   return oss.str();
 }
 
+std::string to_hex(std::vector<unsigned char>& value, size_t showing_max_len)
+{
+  return to_hex( value.data(), value.size(), showing_max_len );
+}
 std::string to_hex(std::string const& value, size_t showing_max_len)
 {
   return to_hex( value.data(), value.size(), showing_max_len );
 }
-
 std::string to_hex(buffer_t& buffer, std::size_t showing_max_len) {
   return to_hex(buffer.ptr_, buffer.len_, showing_max_len);
 }

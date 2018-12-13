@@ -27,14 +27,16 @@ namespace streamer {
 
 std::string to_string(MediaPublishEs* es)
 {
+  std::vector<std::string> media_type{ "unknown", "video", "audio" };
+
   std::ostringstream oss;
   oss << "frameNumber[" << es->frameNumber <<"],";
-  oss << "type[" << static_cast<uint16_t>(es->type) <<"],";
+  oss << "type[" << media_type.at(static_cast<uint16_t>(es->type)) <<"],";
   oss << "isKeyFrame[" << static_cast<uint16_t>(es->isKeyFrame) <<"],";
   oss << "pts[" << es->pts <<"],";
   oss << "dts[" << es->dts <<"],";
   oss << "size[" << es->size <<"],";
-  oss << std::endl << "data[" << to_hex(*es->data) <<"]";
+  oss << std::endl << "media_data[" << to_hex(*es->data) <<"]";
   return oss.str();  
 }
 
@@ -43,10 +45,37 @@ std::string to_string(MediaPublishEsContext& context)
   std::ostringstream oss;
   oss << "publish_id[" << context.publish_id_ << "],"; 
   oss << "frame_number[" << context.frame_number_ << "],"; 
-  if (context.media_es_.back().get())
-    oss << "last es[" << to_string(context.media_es_.back().get()) << "]";
+  oss << "video_frame_number[" << context.video_frame_number_ << "],"; 
+  oss << "audio_frame_number[" << context.audio_frame_number_ << "],"; 
+  if (context.media_es_.back().get()) {
+    oss << "last es_frame_data[" << to_string(context.media_es_.back().get()) << "]";
+  } else {
+    oss << "no es_frame_data" ; 
+  }
+
 
   return oss.str();  
+}
+
+bool ready_to_send(MediaPublishEsContext& context) {
+  if (not context.audio_init_es_.codecInfo.empty() and
+    not context.video_init_es_.codecInfo.empty() and
+    context.video_frame_number_ >= READY_TO_SEND_VIDEO_FRAME_COUNT and
+    context.audio_frame_number_ >= READY_TO_SEND_AUDIO_FRAME_COUNT ) {
+      return true;
+    }
+
+  return false;  
+}
+
+bool end_of_video_es(MediaPublishEsContext& context) {
+  if (not context.video_eos_.empty() and
+    not context.video_init_es_.codecInfo.empty() and
+    context.video_frame_number_ > 0 ) {
+      return true;
+    }
+
+  return false;  
 }
 
 media_publish_es_ptr make_media_es(
@@ -56,7 +85,7 @@ media_publish_es_ptr make_media_es(
   uint8_t is_key_frame,
   uint64_t pts,
   uint64_t dts,
-  std::size_t size,
+  uint32_t size,
   int& ec
 ) {
   ec= 0;
@@ -96,16 +125,6 @@ media_publish_es_ptr make_media_es(
 
 namespace flv_message {
 
-bool read_to_send(MediaPublishEsContext& context) {
-  if (not context.audio_init_es_.codecInfo.empty() and
-    not context.video_init_es_.codecInfo.empty() and
-    context.frame_number_ >= READY_TO_SEND_FRAME_COUNT ) {
-      return true;
-    }
-
-  return false;  
-}
-
 bool process_flv_es_message(
   MediaPublishEsContext& context, 
   unsigned char* const buffer, 
@@ -139,6 +158,10 @@ bool process_flv_es_message(
         codec_info.insert(codec_info.begin(), sv.begin(), sv.end());
         context.audio_init_es_.codecInfo = codec_info;
 
+        //std::cout << "aac_sequence_header parsed" << std::endl;
+      } else {
+        ec = 1;
+        std::cout << "parsing aac_sequence_header fail" << std::endl;
       }
     } else if (is_aac_audio(bf)) {
       buffer_t* audio_es = new buffer_t(len);
@@ -155,12 +178,22 @@ bool process_flv_es_message(
         
         context.media_es_.push_back(media_es);
         ++context.frame_number_;
+        ++context.audio_frame_number_;
+
+        //std::cout << "aac_data parsed" << std::endl;
       }
       else {
+        ec = 1;
+        std::cout << "getting aac_data fail" << std::endl;
         delete audio_es;
       }
     } else {
       ec = 1;
+      std::cout << "parsing audio data fail" << std::endl;
+      std::cout << "message_type[" << to_hex(message_type) <<"],";
+      std::cout << "timestamp[" << timestamp <<"],";
+      std::cout << "message_length[" << message_length <<"]]" << std::endl;
+      std::cout << "message dump > " << to_hex(buffer, buffer_size) << std::endl;;      
     }
   }
   else if (message_type == FLV_VIDEO_ES) {
@@ -183,10 +216,12 @@ bool process_flv_es_message(
         codec_info.insert (codec_info.begin(), d, d+4);
 
         context.video_init_es_.codecInfo = codec_info;
+
+        //std::cout << "avc_sequence_header parsed" << std::endl;
       } else {
         ec = 1;
+        std::cout << "parsing avc_sequence_header fail" << std::endl;
       }     
-
     } else if (is_avc_video(bf)) {
       buffer_t* video_es = new buffer_t(len);
       flv::video_frame_t frame;
@@ -195,7 +230,6 @@ bool process_flv_es_message(
       uint8_t key = frame.keyframe_;
 
       if (get_video(bf, *video_es, frame, len)) {
-
         flv_util::buffer_t* video_ts_es = new flv_util::buffer_t(video_es->len_);
         parsingflv::replace_nalu_strat_code_from_mp4_to_ts(4, *video_es, *video_ts_es);
         delete video_es;
@@ -209,14 +243,35 @@ bool process_flv_es_message(
 
         context.media_es_.push_back(media_es);
         ++context.frame_number_;
+        ++context.video_frame_number_;
+
+        //std::cout << "avc_video parsed" << std::endl;
       } else {
         ec = 1;
+        std::cout << "parsing avc_video fail" << std::endl;
         delete video_es;
       }
+    } else if (is_avc_end_of_sequence(bf)) {
+      buffer_t eos(len);
+      get_avc_end_of_sequence(bf, eos, len);
+      context.video_eos_ = to_vector(eos);
+    } else {
+      ec = 1;
+      std::cout << "parsing video data fail" << std::endl;
+      std::cout << "message_type[" << to_hex(message_type) <<"],";
+      std::cout << "timestamp[" << timestamp <<"],";
+      std::cout << "message_length[" << message_length <<"]]" << std::endl;
+      std::cout << "message dump > " << to_hex(buffer, buffer_size) << std::endl;;      
     }
+  } else {
+    ec = 1;
+    std::cout << "unknown message type["; 
+    std::cout << "message_type[" << to_hex(message_type) <<"],";
+    std::cout << "timestamp[" << timestamp <<"],";
+    std::cout << "message_length[" << message_length <<"]]" << std::endl;
+    std::cout << "message dump > " << to_hex(buffer, buffer_size) << std::endl;;
   }
-  
-  ec = 1;
+ 
   return true;
 }
 
